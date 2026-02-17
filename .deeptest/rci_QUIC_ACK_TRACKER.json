@@ -1,0 +1,103 @@
+{
+  "component": "QUIC_ACK_TRACKER",
+  "source": "src/core/ack_tracker.c",
+  "header": "src/core/ack_tracker.h",
+  "public_apis": [
+    {
+      "name": "QuicAckTrackerInitialize",
+      "signature": "void QuicAckTrackerInitialize(QUIC_ACK_TRACKER* Tracker)",
+      "declared_in": "src/core/ack_tracker.h",
+      "summary": "Initializes the ack tracker's two QUIC_RANGE fields (PacketNumbersReceived, PacketNumbersToAck)",
+      "preconditions": ["Tracker must point to valid memory"],
+      "postconditions": ["Both range fields initialized with their respective max sizes"],
+      "side_effects": ["Sets up range data structures"],
+      "errors": "None",
+      "thread_safety": "DISPATCH_LEVEL max"
+    },
+    {
+      "name": "QuicAckTrackerUninitialize",
+      "signature": "void QuicAckTrackerUninitialize(QUIC_ACK_TRACKER* Tracker)",
+      "declared_in": "src/core/ack_tracker.h",
+      "summary": "Frees resources for both range fields",
+      "preconditions": ["Tracker must have been initialized"],
+      "postconditions": ["Ranges are freed"],
+      "side_effects": ["Memory deallocation"],
+      "errors": "None",
+      "thread_safety": "PASSIVE_LEVEL max"
+    },
+    {
+      "name": "QuicAckTrackerReset",
+      "signature": "void QuicAckTrackerReset(QUIC_ACK_TRACKER* Tracker)",
+      "declared_in": "src/core/ack_tracker.h",
+      "summary": "Resets tracker state: counters, flags, ECN data, and both ranges",
+      "preconditions": ["Tracker must have been initialized"],
+      "postconditions": ["All state zeroed, ranges empty"],
+      "side_effects": ["Clears AckElicitingPacketsToAcknowledge, LargestPacketNumberAcknowledged, LargestPacketNumberRecvTime, AlreadyWrittenAckFrame, NonZeroRecvECN, ReceivedECN"],
+      "errors": "None",
+      "thread_safety": "DISPATCH_LEVEL max"
+    },
+    {
+      "name": "QuicAckTrackerAddPacketNumber",
+      "signature": "BOOLEAN QuicAckTrackerAddPacketNumber(QUIC_ACK_TRACKER* Tracker, uint64_t PacketNumber)",
+      "declared_in": "src/core/ack_tracker.h",
+      "summary": "Adds packet to received set for duplicate detection. Returns TRUE if duplicate.",
+      "preconditions": ["Tracker must have been initialized"],
+      "postconditions": ["Packet added to PacketNumbersReceived range if not already present"],
+      "side_effects": ["Modifies PacketNumbersReceived range"],
+      "errors": "Returns TRUE on duplicate or allocation failure",
+      "thread_safety": "DISPATCH_LEVEL max"
+    },
+    {
+      "name": "QuicAckTrackerDidHitReorderingThreshold",
+      "signature": "BOOLEAN QuicAckTrackerDidHitReorderingThreshold(QUIC_ACK_TRACKER* Tracker, uint8_t ReorderingThreshold)",
+      "declared_in": "src/core/ack_tracker.h",
+      "summary": "Checks if reordering threshold from draft-ietf-quic-frequence-10 Section 6.2 was hit",
+      "preconditions": ["Tracker must have been initialized, PacketNumbersToAck must have been populated"],
+      "postconditions": ["Returns TRUE if gap exceeds threshold, FALSE otherwise"],
+      "side_effects": "None - read-only",
+      "errors": "None",
+      "thread_safety": "N/A (pure function)"
+    },
+    {
+      "name": "QuicAckTrackerHasPacketsToAck",
+      "signature": "BOOLEAN QuicAckTrackerHasPacketsToAck(const QUIC_ACK_TRACKER* Tracker)",
+      "declared_in": "src/core/ack_tracker.h",
+      "summary": "Returns TRUE if there are packets to ACK and ACK frame not already written",
+      "preconditions": ["Tracker must have been initialized"],
+      "postconditions": ["Returns !AlreadyWrittenAckFrame && RangeSize > 0"],
+      "side_effects": "None - read-only",
+      "errors": "None",
+      "thread_safety": "DISPATCH_LEVEL max"
+    }
+  ],
+  "connection_dependent_apis": [
+    {
+      "name": "QuicAckTrackerAckPacket",
+      "summary": "Adds packet to ACK list, handles ECN, may trigger immediate or delayed ACK",
+      "requires_connection": true,
+      "reason": "Uses QuicAckTrackerGetPacketSpace->Connection for send flags, reorder stats, etc."
+    },
+    {
+      "name": "QuicAckTrackerAckFrameEncode",
+      "summary": "Encodes ACK frame into packet builder",
+      "requires_connection": true,
+      "reason": "Uses Builder->Connection and complex QUIC_PACKET_BUILDER interactions"
+    },
+    {
+      "name": "QuicAckTrackerOnAckFrameAcked",
+      "summary": "Handles acknowledgment of previously sent ACK frame",
+      "requires_connection": true,
+      "reason": "Uses QuicAckTrackerGetPacketSpace->Connection for send state updates"
+    }
+  ],
+  "type_invariants": {
+    "QUIC_ACK_TRACKER": {
+      "invariants": [
+        "PacketNumbersReceived and PacketNumbersToAck are valid QUIC_RANGE after init",
+        "AckElicitingPacketsToAcknowledge tracks number pending ACK",
+        "AlreadyWrittenAckFrame == TRUE means no new packets since last frame write",
+        "NonZeroRecvECN == TRUE iff any ECN count > 0"
+      ]
+    }
+  }
+}

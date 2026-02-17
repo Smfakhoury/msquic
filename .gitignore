@@ -388,4 +388,4 @@ _site
 APKBUILD
 
 # Temporary package download folder by validation script
-msquic-packages/
+msquic-packages/.deeptest/
